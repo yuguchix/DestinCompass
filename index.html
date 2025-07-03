@@ -6,6 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- ❶ Leafletの下に turf.js を追加 -->
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+
   <style>
     body { font-family: sans-serif; margin: 0; padding: 0; }
     #form-screen, #map-screen { padding: 1em; }
@@ -58,7 +61,9 @@
 <!-- Leaflet -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-  let map, marker;
+  let map, marker, line, path = [], watchId;
+  let baseRank = 1, extraBoost = 0;
+  let zodiacGlobal = "", directionGlobal = "";
 
   function hashString(str) {
     let hash = 0;
@@ -75,42 +80,74 @@
     return (hash % 12) + 1;
   }
 
+  function updateFortuneDisplay() {
+    const total = Math.min(12, baseRank + extraBoost);
+    document.getElementById("fortune-display").innerHTML =
+      `${zodiacGlobal} × ${directionGlobal}<br>運勢ランク：<strong>${total}</strong> / 12<br>` +
+      (extraBoost > 0 ? `（+${extraBoost} ランクUP💪）` : '');
+  }
+
   function startFortune() {
-    const zodiac = document.getElementById("zodiac").value;
-    const direction = document.getElementById("direction").value;
+    zodiacGlobal = document.getElementById("zodiac").value;
+    directionGlobal = document.getElementById("direction").value;
     const today = new Date().toISOString().slice(0, 10);
-    const rank = getFortuneRank(zodiac, direction, today);
+    baseRank = getFortuneRank(zodiacGlobal, directionGlobal, today);
+    extraBoost = 0;
 
-    const resultText = `${zodiac} × ${direction} の今日の運勢は… ランク ${rank}/12`;
-    document.getElementById("fortune-display").textContent = resultText;
+    updateFortuneDisplay();
 
-    // 表示切り替え
     document.getElementById("form-screen").style.display = "none";
     document.getElementById("map-screen").style.display = "block";
 
-    // 現在地取得 → 地図表示
     if (!navigator.geolocation) {
       alert("位置情報が取得できません");
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
+    watchId = navigator.geolocation.watchPosition(
       (pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
+        const point = [lng, lat]; // turf: [lng, lat]
 
-        map = L.map('map').setView([lat, lng], 15);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(map);
+        path.push(point);
 
-        marker = L.marker([lat, lng]).addTo(map).bindPopup("あなたの現在地").openPopup();
+        if (!map) {
+          map = L.map('map').setView([lat, lng], 15);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+          }).addTo(map);
+        }
+
+        if (!marker) {
+          marker = L.marker([lat, lng]).addTo(map).bindPopup("現在地").openPopup();
+        } else {
+          marker.setLatLng([lat, lng]);
+        }
+
+        if (line) {
+          map.removeLayer(line);
+        }
+
+        const latlngs = path.map(p => [p[1], p[0]]);
+        line = L.polyline(latlngs, { color: 'blue' }).addTo(map);
+
+        if (path.length >= 2) {
+          const lineString = turf.lineString(path);
+          const distKm = turf.length(lineString);
+          const distM = Math.round(distKm * 1000);
+
+          extraBoost = Math.min(3, Math.floor(distM / 100)); // 100mごとに +1（最大+3）
+          updateFortuneDisplay();
+        }
       },
       (err) => {
         alert("位置取得エラー: " + err.message);
-      }
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
     );
   }
+
 </script>
 
 </body>
