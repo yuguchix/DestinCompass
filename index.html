@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <title>DestinCompass</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
@@ -23,17 +22,48 @@
       z-index: 999;
     }
     #fortune-chart {
-      max-width: 300px;
+      max-width: 400px;
       margin: 0 auto;
     }
+    #total-score {
+      text-align: center;
+      font-weight: bold;
+      font-size: 1.2em;
+      margin-top: 10px;
+    }
+    #ranking-list {
+      margin-top: 20px;
+      text-align: center;
+    }
+    #ranking-list ul {
+      list-style: none;
+      padding: 0;
+    }
+    #ranking-list li {
+      margin: 4px 0;
+    }
+    /* CSSに追加（右上に固定） */
+    #fortune-summary {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 220px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 10px;
+      padding: 10px;
+      z-index: 1000;
+      text-align: center;
+      font-size: 0.9em;
+      box-shadow: 0 0 5px rgba(0,0,0,0.2);
+    }
+
   </style>
 </head>
 <body>
 
 <!-- ★★ 占いフォーム画面 ★★ -->
 <div id="form-screen">
-  <h2>🔮 方角占いを始めよう</h2>
-
+  <h2>🔮 今日の16方位運勢チャート</h2>
   <label>星座を選ぶ：
     <select id="zodiac">
       <option>おひつじ座</option><option>おうし座</option><option>ふたご座</option>
@@ -41,19 +71,12 @@
       <option>てんびん座</option><option>さそり座</option><option>いて座</option>
       <option>やぎ座</option><option>みずがめ座</option><option>うお座</option>
     </select>
-  </label><br><br>
-
-  <label>方位を選ぶ：
-    <select id="direction">
-      <option>北</option><option>北北東</option><option>北東</option><option>東北東</option>
-      <option>東</option><option>東南東</option><option>南東</option><option>南南東</option>
-      <option>南</option><option>南南西</option><option>南西</option><option>西南西</option>
-      <option>西</option><option>西北西</option><option>北西</option><option>北北西</option>
-    </select>
-  </label><br><br>
-
-  <canvas id="fortune-chart" width="300" height="300"></canvas><br>
-  <button onclick="startFortune()">占う → 地図へ</button>
+  </label>
+  <button onclick="showFullFortuneChart()">表示</button>
+  <canvas id="fortune-chart" width="350" height="350"></canvas><br>
+  <div id="total-score"></div><br>
+  <div id="ranking-list"></div>
+  <button onclick="startFortune()">地図へ →</button>
 </div>
 
 <!-- ★★ 地図表示画面 ★★ -->
@@ -62,12 +85,83 @@
   <div id="map"></div>
 </div>
 
+<!-- 地図表示画面に追加（map-screen内） -->
+<div id="fortune-summary">
+  <div id="summary-zodiac"></div>
+  <canvas id="summary-chart" width="200" height="200"></canvas>
+  <div id="summary-score"></div>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 let map, marker, line, path = [], watchId;
 let baseRank = 1, extraBoost = 0;
 let zodiacGlobal = "", directionGlobal = "";
-const directionLabels = ["北", "北東", "東", "南東", "南", "南西", "西", "北西", "北北東", "東南東", "南南西", "西北西"];
+let fortuneChart;
+let summaryChart;
+const directionLabels = ["北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西"];
+const zodiacList = ["おひつじ座", "おうし座", "ふたご座", "かに座", "しし座", "おとめ座", "てんびん座", "さそり座", "いて座", "やぎ座", "みずがめ座", "うお座"];
+
+function showSummaryChart(zodiac, dateStr) {
+  const ranks = directionLabels.map(dir => getFortuneRank(zodiac, dir, dateStr));
+  const total = ranks.reduce((a, b) => a + b, 0);
+
+  document.getElementById("summary-zodiac").textContent = `🌟 ${zodiac}`;
+  document.getElementById("summary-score").textContent = `運気合計：${total} / 192`;
+
+  const ctx = document.getElementById("summary-chart").getContext("2d");
+
+  if (summaryChart) summaryChart.destroy(); // 前のチャートを破棄
+
+  summaryChart = new Chart(ctx, {
+    type: 'polarArea',
+    data: {
+      labels: directionLabels,
+      datasets: [{
+        label: '運勢',
+        data: ranks,
+        backgroundColor: ranks.map(rank => `rgba(${255 - rank * 10}, ${100 + rank * 10}, 200, 0.6)`),
+      }]
+    },
+    options: {
+      scales: { r: { suggestedMin: 0, suggestedMax: 12, ticks: { stepSize: 1 } } },
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
+function getScoreDelta(rank) {
+  if (rank >= 9) return 1;
+  if (rank <= 4) return -1;
+  return 0;
+}
+
+function bearingToDirection(bearing) {
+  const directions = directionLabels;
+  const adjusted = (bearing + 360 + 11.25) % 360; // 中央角で切り替え
+  const index = Math.floor(adjusted / 22.5) % 16;
+  return directions[index];
+}
+
+function calculateBearing(from, to) {
+  const fromPoint = turf.point(from);
+  const toPoint = turf.point(to);
+  return turf.bearing(fromPoint, toPoint); // -180〜180°
+}
+
+function showFullFortuneChart() {
+  // ...（略）
+  const ctx = document.getElementById("fortune-chart").getContext("2d");
+
+  // 前のチャートが存在すれば破棄
+  if (fortuneChart) {
+    fortuneChart.destroy();
+  }
+
+  fortuneChart = new Chart(ctx, {
+    // ...（省略）
+  });
+}
 
 function hashString(str) {
   let hash = 0;
@@ -84,8 +178,12 @@ function getFortuneRank(zodiac, direction, dateStr) {
   return (hash % 12) + 1;
 }
 
-function showPolarFortuneChart(zodiac, dateStr) {
-  const ranks = directionLabels.map(dir => getFortuneRank(zodiac, dir, dateStr));
+function showFullFortuneChart() {
+  const selectedZodiac = document.getElementById("zodiac").value;
+  const today = new Date().toISOString().slice(0, 10);
+  const ranks = directionLabels.map(dir => getFortuneRank(selectedZodiac, dir, today));
+  const total = ranks.reduce((a, b) => a + b, 0);
+
   const ctx = document.getElementById("fortune-chart").getContext("2d");
   new Chart(ctx, {
     type: 'polarArea',
@@ -102,27 +200,42 @@ function showPolarFortuneChart(zodiac, dateStr) {
       plugins: { legend: { position: 'right' } }
     }
   });
+
+  document.getElementById("total-score").textContent = `あなたの本日の運気合計スコア：${total} / 192`;
+
+  // 全星座のランキングを計算して表示
+  const ranking = zodiacList.map(z => {
+    const score = directionLabels.map(dir => getFortuneRank(z, dir, today)).reduce((a, b) => a + b, 0);
+    return { zodiac: z, score: score };
+  }).sort((a, b) => b.score - a.score);
+
+  const rankingHtml = `<h3>🔢 全星座ランキング（運気スコア）</h3><ul>` +
+    ranking.map((item, index) => `<li>${index + 1}位：${item.zodiac}（${item.score}点）</li>`).join('') +
+    `</ul>`;
+
+  document.getElementById("ranking-list").innerHTML = rankingHtml;
 }
 
-function updateFortuneDisplay() {
+function updateFortuneDisplay() {/*
   const total = Math.min(12, baseRank + extraBoost);
   document.getElementById("fortune-display").innerHTML =
     `${zodiacGlobal} × ${directionGlobal}<br>運勢ランク：<strong>${total}</strong> / 12<br>` +
-    (extraBoost > 0 ? `（+${extraBoost} ランクUP💪）` : '');
+    `（ベース：${baseRank} + 移動補正：${extraBoost}）`;*/
 }
 
 function startFortune() {
   zodiacGlobal = document.getElementById("zodiac").value;
-  directionGlobal = document.getElementById("direction").value;
+  directionGlobal = "選択なし";
   const today = new Date().toISOString().slice(0, 10);
-  baseRank = getFortuneRank(zodiacGlobal, directionGlobal, today);
+  baseRank = 6;
   extraBoost = 0;
 
-  showPolarFortuneChart(zodiacGlobal, today);
   updateFortuneDisplay();
-
   document.getElementById("form-screen").style.display = "none";
   document.getElementById("map-screen").style.display = "block";
+
+  // 星座・チャート・スコアを右上に表示
+  showSummaryChart(zodiacGlobal, today);
 
   if (!navigator.geolocation) {
     alert("位置情報が取得できません");
@@ -160,15 +273,40 @@ function startFortune() {
         const lineString = turf.lineString(path);
         const distKm = turf.length(lineString);
         const distM = Math.round(distKm * 1000);
-
         extraBoost = Math.min(3, Math.floor(distM / 100));
         updateFortuneDisplay();
       }
+      if (path.length >= 2) {
+        const prev = path[path.length - 2];
+        const curr = path[path.length - 1];
+
+        // 方位計算
+        const bearing = calculateBearing(prev, curr); // -180〜180
+        const angle = (bearing + 360) % 360; // 0〜360に正規化
+        const direction = bearingToDirection(angle);
+
+        directionGlobal = direction;
+
+        const today = new Date().toISOString().slice(0, 10);
+        const rank = getFortuneRank(zodiacGlobal, direction, today);
+        baseRank += getScoreDelta(rank);
+        baseRank = Math.max(0, Math.min(12, baseRank)); // 範囲制限
+
+        // 距離による extraBoost はそのまま継続
+        const lineString = turf.lineString(path);
+        const distKm = turf.length(lineString);
+        const distM = Math.round(distKm * 1000);
+        extraBoost = Math.min(3, Math.floor(distM / 100));
+
+        updateFortuneDisplay();
+      }
+
     },
     (err) => {
       alert("位置取得エラー: " + err.message);
     },
     { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+    
   );
 }
 </script>
