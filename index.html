@@ -44,6 +44,7 @@
     }
     /* CSSに追加（右上に固定） */
     #fortune-summary {
+      display: none; /* ← これを追加！ */
       position: absolute;
       top: 10px;
       right: 10px;
@@ -234,6 +235,9 @@ function startFortune() {
   document.getElementById("form-screen").style.display = "none";
   document.getElementById("map-screen").style.display = "block";
 
+  // ← ここで右上の表示を有効にする！
+  document.getElementById("fortune-summary").style.display = "block";
+  
   // 星座・チャート・スコアを右上に表示
   showSummaryChart(zodiacGlobal, today);
 
