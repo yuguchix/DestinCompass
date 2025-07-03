@@ -56,8 +56,13 @@
       text-align: center;
       font-size: 0.9em;
       box-shadow: 0 0 5px rgba(0,0,0,0.2);
+      
     }
-
+    @media screen and (max-width: 768px) {
+      #summary-chart {
+        display: none !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -82,16 +87,19 @@
 
 <!-- ★★ 地図表示画面 ★★ -->
 <div id="map-screen" style="display:none;">
-  <div id="fortune-display"></div>
+  <!-- 地図画面にボタンを追加（#map-screen内の下でOK） -->
+  <button id="toggle-chart-btn" style="position:absolute; top:10px; right:10px; z-index:1001;">
+    チャート表示/非表示
+  </button>
   <div id="map"></div>
+  <div id="fortune-display"></div>
+  <div id="fortune-summary">
+    <div id="summary-zodiac"></div>
+    <canvas id="summary-chart" width="200" height="200"></canvas>
+    <div id="summary-score"></div>
+  </div>
 </div>
 
-<!-- 地図表示画面に追加（map-screen内） -->
-<div id="fortune-summary">
-  <div id="summary-zodiac"></div>
-  <canvas id="summary-chart" width="200" height="200"></canvas>
-  <div id="summary-score"></div>
-</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -313,6 +321,26 @@ function startFortune() {
     
   );
 }
+
+// チャート表示切り替え
+document.getElementById("toggle-chart-btn").addEventListener("click", () => {
+  const chart = document.getElementById("summary-chart");
+  const style = window.getComputedStyle(chart);
+
+  // スマホでCSSが非表示になっている場合は強制的に表示不可
+  if (window.innerWidth <= 768) {
+    alert("スマホ表示ではチャートは非表示です");
+    return;
+  }
+
+  // PC等の場合は表示/非表示切り替え
+  if (style.display === "none") {
+    chart.style.display = "block";
+  } else {
+    chart.style.display = "none";
+  }
+});
+
 </script>
 </body>
 </html>
