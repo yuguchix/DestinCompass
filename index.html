@@ -96,6 +96,11 @@
   <button id="toggle-chart-btn" style="position:absolute; top:10px; right:10px; z-index:1001;">
     チャート表示/非表示
   </button>
+  <!-- 地図画面（#map-screen）内に戻るボタン -->
+  <button id="back-to-form-btn" style="position:absolute; top:10px; left:10px; z-index:1001;">
+    ← 戻る
+  </button>
+
   <div id="map"></div>
   <div id="fortune-display"></div>
   <div id="fortune-summary">
@@ -331,6 +336,20 @@ document.getElementById("toggle-chart-btn").addEventListener("click", () => {
   } else {
     chart.style.display = "none";
   }
+});
+
+document.getElementById("back-to-form-btn").addEventListener("click", () => {
+  // 地図画面を非表示、フォームを再表示
+  document.getElementById("map-screen").style.display = "none";
+  document.getElementById("form-screen").style.display = "block";
+
+  // 位置情報の追跡を止める（必要に応じて）
+  if (watchId) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+
+  // マップインスタンスなどはそのまま残しておけば再開も可能
 });
 
 </script>
