@@ -87,6 +87,7 @@
   <canvas id="fortune-chart" width="350" height="350"></canvas><br>
   <div id="total-score"></div><br>
   <div id="ranking-list"></div>
+  <div id="daily-walk-summary"></div>
   <button onclick="startFortune()">地図へ →</button>
 </div>
 
@@ -319,6 +320,19 @@ function startFortune() {
   );
 }
 
+function saveDailyWalkData(direction, distance) {
+  const today = new Date().toISOString().slice(0, 10); // e.g. "2025-07-03"
+  let logs = JSON.parse(localStorage.getItem("dailyWalkLogs") || "{}");
+
+  if (!logs[today]) logs[today] = {};
+  if (!logs[today][direction]) logs[today][direction] = 0;
+
+  logs[today][direction] += distance;
+
+  localStorage.setItem("dailyWalkLogs", JSON.stringify(logs));
+}
+
+
 // チャート表示切り替え
 document.getElementById("toggle-chart-btn").addEventListener("click", () => {
   const chart = document.getElementById("summary-chart");
@@ -337,6 +351,24 @@ document.getElementById("toggle-chart-btn").addEventListener("click", () => {
     chart.style.display = "none";
   }
 });
+function displayTodayWalkSummary() {
+  const today = new Date().toISOString().slice(0, 10);
+  const logs = JSON.parse(localStorage.getItem("dailyWalkLogs") || "{}");
+  const todayData = logs[today] || {};
+
+  if (Object.keys(todayData).length === 0) {
+    document.getElementById("daily-walk-summary").innerHTML = "今日の歩行記録はまだありません。";
+    return;
+  }
+
+  let html = "<h3>🚶‍♂️ 今日の方角別 歩行距離</h3><ul>";
+  for (const [direction, distance] of Object.entries(todayData)) {
+    html += `<li>${direction}：${Math.round(distance)} m</li>`;
+  }
+  html += "</ul>";
+
+  document.getElementById("daily-walk-summary").innerHTML = html;
+}
 
 document.getElementById("back-to-form-btn").addEventListener("click", () => {
   // 地図画面を非表示、フォームを再表示
@@ -350,6 +382,14 @@ document.getElementById("back-to-form-btn").addEventListener("click", () => {
   }
 
   // マップインスタンスなどはそのまま残しておけば再開も可能
+});
+// たとえば方向が判明したあと
+const distance = distM - previousDistM; // 前回との差分（歩いた分）
+if (distance > 0 && distance < 500) {  // 急なジャンプを防ぐ
+  saveDailyWalkData(direction, distance);
+}
+window.addEventListener("DOMContentLoaded", () => {
+  displayTodayWalkSummary(); // ← これを追加
 });
 
 </script>
