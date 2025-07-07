@@ -42,13 +42,17 @@
     #ranking-list li {
       margin: 4px 0;
     }
+    #summary-chart {
+      width: 300px;
+      height: 300px;
+    }
     /* CSSに追加（右上に固定） */
     #fortune-summary {
       display: none; /* ← これを追加！ */
       position: absolute;
       top: 10px;
       right: 10px;
-      width: 220px;
+      width: 320px;
       background: rgba(255, 255, 255, 0.9);
       border-radius: 10px;
       padding: 10px;
@@ -58,6 +62,7 @@
       box-shadow: 0 0 5px rgba(0,0,0,0.2);
       
     }
+
     @media screen and (max-width: 768px) {
       #summary-chart {
         display: none !important;
@@ -95,7 +100,7 @@
   <div id="fortune-display"></div>
   <div id="fortune-summary">
     <div id="summary-zodiac"></div>
-    <canvas id="summary-chart" width="200" height="200"></canvas>
+    <canvas id="summary-chart" width="300" height="300"></canvas>
     <div id="summary-score"></div>
   </div>
 </div>
@@ -158,19 +163,6 @@ function calculateBearing(from, to) {
   return turf.bearing(fromPoint, toPoint); // -180〜180°
 }
 
-function showFullFortuneChart() {
-  // ...（略）
-  const ctx = document.getElementById("fortune-chart").getContext("2d");
-
-  // 前のチャートが存在すれば破棄
-  if (fortuneChart) {
-    fortuneChart.destroy();
-  }
-
-  fortuneChart = new Chart(ctx, {
-    // ...（省略）
-  });
-}
 
 function hashString(str) {
   let hash = 0;
